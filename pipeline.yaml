@@ -1,0 +1,169 @@
+name: xyield
+apiVersion: 3
+resource_size: s
+
+sources:
+  ink_sepolia_logs:
+    type: dataset
+    dataset_name: ink_sepolia.raw_logs
+    version: 1.0.0
+    start_at: latest
+    filter: address = '0xe6bf9838b13956f9ff8bde0008d7b333f82293b7' OR address = '0xd4a1d2ffd7e12cdf44fdd20cbbd398cbd6320e32' OR address = '0xe220e9de9086f823b39cc5271912f0c17e7aeb80' OR address = '0xb72654ed175dfd49146ae163d494b4339f445482'
+
+transforms:
+  # ── AutocallEngine: decode ──
+  engine_decoded:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        _gs_log_decode(
+          '[{"anonymous":false,"type":"event","name":"NoteCreated","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"holder","type":"address","indexed":true},{"name":"notional","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"RequestPricing","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"basket","type":"address[]","indexed":false},{"name":"notional","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"NoteStateChanged","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"from","type":"uint8","indexed":false},{"name":"to","type":"uint8","indexed":false}]},{"anonymous":false,"type":"event","name":"CouponPaid","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"amount","type":"uint256","indexed":false},{"name":"memoryPaid","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"CouponMissed","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"memoryAccumulated","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"CouponStreamed","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"streamId","type":"uint256","indexed":false},{"name":"amount","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"NoteAutocalled","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"observation","type":"uint8","indexed":false}]},{"anonymous":false,"type":"event","name":"NoteSettled","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"payout","type":"uint256","indexed":false},{"name":"kiPhysical","type":"bool","indexed":false}]},{"anonymous":false,"type":"event","name":"EmergencyPaused","inputs":[{"name":"noteId","type":"bytes32","indexed":true}]},{"anonymous":false,"type":"event","name":"EmergencyResumed","inputs":[{"name":"noteId","type":"bytes32","indexed":true}]},{"anonymous":false,"type":"event","name":"NoteCancelled","inputs":[{"name":"noteId","type":"bytes32","indexed":true}]}]',
+          `topics`,
+          `data`
+        ) AS `decoded`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM ink_sepolia_logs
+      WHERE address = '0xe6bf9838b13956f9ff8bde0008d7b333f82293b7'
+
+  engine_events:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        decoded.event_params AS `event_params`,
+        decoded.event_signature AS `event_signature`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM engine_decoded
+      WHERE decoded IS NOT NULL
+
+  # ── XYieldVault: decode ──
+  vault_decoded:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        _gs_log_decode(
+          '[{"anonymous":false,"type":"event","name":"DepositRequested","inputs":[{"name":"requestId","type":"uint256","indexed":true},{"name":"depositor","type":"address","indexed":true},{"name":"amount","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"DepositReadyToClaim","inputs":[{"name":"requestId","type":"uint256","indexed":true},{"name":"noteId","type":"bytes32","indexed":true}]},{"anonymous":false,"type":"event","name":"DepositClaimed","inputs":[{"name":"requestId","type":"uint256","indexed":true},{"name":"noteId","type":"bytes32","indexed":true},{"name":"tokenId","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"DepositRefunded","inputs":[{"name":"requestId","type":"uint256","indexed":true},{"name":"depositor","type":"address","indexed":true},{"name":"amount","type":"uint256","indexed":false}]}]',
+          `topics`,
+          `data`
+        ) AS `decoded`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM ink_sepolia_logs
+      WHERE address = '0xd4a1d2ffd7e12cdf44fdd20cbbd398cbd6320e32'
+
+  vault_events:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        decoded.event_params AS `event_params`,
+        decoded.event_signature AS `event_signature`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM vault_decoded
+      WHERE decoded IS NOT NULL
+
+  # ── CouponStreamer: decode ──
+  streamer_decoded:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        _gs_log_decode(
+          '[{"anonymous":false,"type":"event","name":"CouponStreamStarted","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"holder","type":"address","indexed":true},{"name":"streamId","type":"uint256","indexed":false},{"name":"amount","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"CouponStreamCancelled","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"streamId","type":"uint256","indexed":true},{"name":"refundedAmount","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"CouponWithdrawn","inputs":[{"name":"streamId","type":"uint256","indexed":true},{"name":"recipient","type":"address","indexed":true},{"name":"amount","type":"uint256","indexed":false}]}]',
+          `topics`,
+          `data`
+        ) AS `decoded`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM ink_sepolia_logs
+      WHERE address = '0xe220e9de9086f823b39cc5271912f0c17e7aeb80'
+
+  streamer_events:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        decoded.event_params AS `event_params`,
+        decoded.event_signature AS `event_signature`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM streamer_decoded
+      WHERE decoded IS NOT NULL
+
+  # ── NoteToken: decode ──
+  notetoken_decoded:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        _gs_log_decode(
+          '[{"anonymous":false,"type":"event","name":"NoteMinted","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"holder","type":"address","indexed":true},{"name":"amount","type":"uint256","indexed":false}]},{"anonymous":false,"type":"event","name":"NoteBurned","inputs":[{"name":"noteId","type":"bytes32","indexed":true},{"name":"holder","type":"address","indexed":true},{"name":"amount","type":"uint256","indexed":false}]}]',
+          `topics`,
+          `data`
+        ) AS `decoded`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM ink_sepolia_logs
+      WHERE address = '0xb72654ed175dfd49146ae163d494b4339f445482'
+
+  notetoken_events:
+    primary_key: id
+    sql: |
+      SELECT
+        `id`,
+        decoded.event_params AS `event_params`,
+        decoded.event_signature AS `event_signature`,
+        block_number,
+        block_timestamp,
+        transaction_hash,
+        log_index
+      FROM notetoken_decoded
+      WHERE decoded IS NOT NULL
+
+sinks:
+  engine_pg:
+    type: postgres
+    table: engine_events
+    schema: indexer
+    secret_name: XYIELD_PG
+    from: engine_events
+
+  vault_pg:
+    type: postgres
+    table: vault_events
+    schema: indexer
+    secret_name: XYIELD_PG
+    from: vault_events
+
+  streamer_pg:
+    type: postgres
+    table: streamer_events
+    schema: indexer
+    secret_name: XYIELD_PG
+    from: streamer_events
+
+  notetoken_pg:
+    type: postgres
+    table: notetoken_events
+    schema: indexer
+    secret_name: XYIELD_PG
+    from: notetoken_events
