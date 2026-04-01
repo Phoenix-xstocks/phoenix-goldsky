@@ -7,7 +7,7 @@ sources:
     type: dataset
     dataset_name: ink_sepolia.raw_logs
     version: 1.0.0
-    start_at: latest
+    start_at: "1775071296000"
     filter: address = '0xe6bf9838b13956f9ff8bde0008d7b333f82293b7' OR address = '0xd4a1d2ffd7e12cdf44fdd20cbbd398cbd6320e32' OR address = '0xe220e9de9086f823b39cc5271912f0c17e7aeb80' OR address = '0xb72654ed175dfd49146ae163d494b4339f445482'
 
 transforms:
